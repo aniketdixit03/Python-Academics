@@ -1,3 +1,4 @@
+#Q_1 (Ex-3) 
 from mpi4py import MPI
 import numpy as np
 

@@ -1,3 +1,4 @@
+#Q_1 (Ex-4)
 from mpi4py import MPI
 
 # Function to compute factorial of a given number
