@@ -1,48 +1,52 @@
 #Q_2 (Ex-5)
 from mpi4py import MPI
+import random
+
+# Initialize MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+# Number of digits in the input (maximum 3 in this case)
+num_digits = 3
+
+def get_digit(number, position):
+    return (number // (10 ** position)) % 10
 
 def bucket_sort(numbers):
-    buckets = [[] for _ in range(10)]  # 10 buckets for digits 0-9
-
-    # Distribute numbers into buckets based on first digit
+    # Partition numbers into buckets based on their digits
+    buckets = [[] for _ in range(10)]
     for num in numbers:
-        first_digit = num // 100 if num >= 100 else num // 10
-        buckets[first_digit].append(num)
-
+        digit = get_digit(num, rank)
+        buckets[digit].append(num)
+    
     # Sort each bucket
-    for i in range(len(buckets)):
-        buckets[i].sort()
-
-    return buckets
-
-def merge_sorted_buckets(sorted_buckets):
-    return [num for bucket in sorted_buckets for num in bucket]
-
-if __name__ == "__main__":
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-
+    sorted_buckets = [sorted(bucket) for bucket in buckets]
+    
+    # Gather sorted buckets at master process
+    all_sorted_buckets = comm.gather(sorted_buckets, root=0)
+    
+    # Concatenate sorted buckets
     if rank == 0:
-        n = int(input("Enter the number of elements: "))
-        numbers = [int(input(f"Enter number {i+1}: ")) for i in range(n)]
-    else:
-        numbers = None
+        sorted_numbers = []
+        for i in range(10):
+            for bucket in all_sorted_buckets:
+                sorted_numbers.extend(bucket[i])
+        return sorted_numbers
 
-    # Broadcast numbers to all processes
-    numbers = comm.bcast(numbers, root=0)
+if rank == 0:
+    # Generate random numbers
+    n = 10  # Total numbers
+    random_numbers = [random.randint(0, 999) for _ in range(n)]
+else:
+    random_numbers = None
 
-    # Divide numbers into buckets
-    local_bucket_size = len(numbers) // size
-    local_numbers = numbers[rank * local_bucket_size : (rank + 1) * local_bucket_size]
+# Broadcast random numbers to all processes
+random_numbers = comm.bcast(random_numbers, root=0)
 
-    # Perform bucket sort locally
-    local_sorted_buckets = bucket_sort(local_numbers)
+# Perform bucket sort
+sorted_numbers = bucket_sort(random_numbers)
 
-    # Gather all sorted buckets at the master process
-    all_sorted_buckets = comm.gather(local_sorted_buckets, root=0)
-
-    if rank == 0:
-        # Merge sorted buckets to get final sorted list
-        sorted_numbers = merge_sorted_buckets(all_sorted_buckets)
-        print("Sorted numbers:", sorted_numbers)
+# Output sorted numbers from master process
+if rank == 0:
+    print("Sorted Numbers:", sorted_numbers)
